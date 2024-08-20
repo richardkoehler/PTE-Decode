@@ -1,5 +1,6 @@
 """Module for running decoding experiments."""
 
+import gzip
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -187,9 +188,9 @@ class _Results:
 
     def save_predictions_timelocked(self) -> None:
         """Save predictions time-locked to trial onset"""
-        with open(
-            self.path / f"{self.filename}_PredTimelocked.json",
-            "w",
+        with gzip.open(  # noqa: F821
+            self.path / f"{self.filename}_PredTimelocked.json.gz",
+            mode="wt",
             encoding="utf-8",
         ) as file:
             json.dump(self.predictions_epochs, file)

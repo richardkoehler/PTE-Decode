@@ -273,7 +273,9 @@ def _add_lines(
     ]
     ax.add_collection(
         collections.LineCollection(
-            lines, colors="grey", linewidths=0.5  # 1.0, alpha=0.5
+            lines,
+            colors="grey",
+            linewidths=0.5,  # 1.0, alpha=0.5
         )  # type: ignore
     )
 
@@ -745,19 +747,20 @@ def _pval_correction_lineplot(
             return cluster_times
         cluster_count = len(clusters_ind)
         clusters = np.zeros(data_a_stat.shape[0], dtype=np.int32)
-        for ind in clusters_ind:
-            clusters[ind] = 1
+        for cnt, cluster_ind in enumerate(clusters_ind):
+            clusters[cluster_ind] = cnt
     elif correction_method in ["cluster_pvals", "fdr"]:
         p_vals = pte_stats.timeseries_pvals(
             x=data_a_stat, y=data_b, n_perm=n_perm, two_tailed=two_tailed
         )
-        clusters, cluster_count = pte_stats.clusters_from_pvals(
+        clusters_list, cluster_count = pte_stats.clusters_from_pvals(
             p_vals=p_vals,
             alpha=alpha,
             correction_method=correction_method,
             n_perm=n_perm,
             min_cluster_size=min_cluster_size,
         )
+        clusters = np.array(clusters_list)
     else:
         raise ValueError(
             f"Unknown cluster correction method: {correction_method}."

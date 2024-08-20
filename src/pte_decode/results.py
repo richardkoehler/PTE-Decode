@@ -1,5 +1,6 @@
 """Module for loading results from decoding experiments."""
 
+import gzip
 import json
 from collections.abc import Sequence
 from pathlib import Path
@@ -185,9 +186,7 @@ def load_results_singlechannel(
         )
         for ch_name in data.index.unique():
             score = (
-                data.loc[ch_name]
-                .mean(numeric_only=True)
-                .values[0]  # type: ignore
+                data.loc[ch_name].mean(numeric_only=True).values[0]  # type: ignore
             )
             results.append([subject, ch_name, score])
     columns = [
@@ -344,7 +343,8 @@ def load_predictions_singlefile(
         items_kept.append(item)
     filename = "_".join(items_kept)
     sub, med, stim = pte.filetools.sub_med_stim_from_fname(filename)
-    with open(file, encoding="utf-8") as in_file:
+    with gzip.open(file, mode="rt", encoding="utf-8") as in_file:  # noqa: F821
+        # with open(file, encoding="utf-8") as in_file:
         pred_data = json.load(in_file)
 
     times = np.array(pred_data.pop("times"))
