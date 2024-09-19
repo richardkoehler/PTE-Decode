@@ -41,7 +41,7 @@ dependencies = [
   "scikit-learn",
   "scipy",
   "seaborn",
-  "statannotations",
+  "statannotations<=0.4.4",
   "xgboost",
 ]
 
