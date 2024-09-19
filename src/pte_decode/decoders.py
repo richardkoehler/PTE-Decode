@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-import catboost
 import numpy as np
 import pandas as pd
 import xgboost as xgb
@@ -218,7 +217,7 @@ def get_decoder(
     Parameters
     ----------
     classifier : str
-        Allowed values for `classifier`: ["catboost", "lda", "lin_svm", "lr",
+        Allowed values for `classifier`: ["lda", "lin_svm", "lr",
         "svm_lin", "svm_poly", "svm_rbf", "xgb"].
     scoring : str | None, default="balanced_accuracy"
         Score to be calculated. Possible values:
@@ -233,7 +232,6 @@ def get_decoder(
         Instance of Decoder given `classifier` and `balancing` method.
     """
     classifiers = {
-        "catboost": CATB,
         "dummy": Dummy,
         "lda": LDA,
         "lr": LR,
@@ -325,153 +323,6 @@ class DecoderNotFoundError(Exception):
             f"{{self.message}} Allowed values: {self.allowed}."
             " Got: {self.input_value}."
         )
-
-
-@dataclass
-class CATB(Decoder):
-    """Class for CatBoostClassifier implementation."""
-
-    def fit_and_predict(
-        self,
-        data_train: pd.DataFrame,
-        data_test: pd.DataFrame,
-        labels: np.ndarray,
-        groups: np.ndarray,
-    ) -> pd.Series:
-        """Fit model to given training data and training labels."""
-        self.data_train = data_train
-        self.labels_train = labels
-        self.groups_train = groups
-
-        if self.optimize:
-            self.model = self._bayesian_optimization()
-        else:
-            self.model = catboost.CatBoostClassifier(
-                loss_function="MultiClass",
-                verbose=False,
-                use_best_model=True,
-                eval_metric="MultiClass",
-            )
-
-        # Train outer model
-        (
-            self.data_train,
-            self.labels_train,
-            eval_set,
-        ) = self._get_validation_split(
-            self.data_train,
-            self.labels_train,
-            self.groups_train,
-            train_size=0.8,
-        )
-
-        (
-            self.data_train,
-            self.labels_train,
-            sample_weight,
-        ) = self.balance_samples(self.data_train, self.labels_train)
-
-        self.model.fit(
-            self.data_train,
-            self.labels_train,
-            eval_set=eval_set,
-            early_stopping_rounds=25,
-            sample_weight=sample_weight,
-            verbose=False,
-        )
-        return self.model.predict(data_test)
-
-    def _bayesian_optimization(self):
-        """Estimate optimal model parameters using bayesian optimization."""
-        optimizer = BayesianOptimization(
-            self._bo_tune,
-            {
-                "max_depth": (4, 10),
-                "learning_rate": (0.003, 0.3),
-                "bagging_temperature": (0.0, 1.0),
-                "l2_leaf_reg": (1, 30),
-                "random_strength": (0.01, 1.0),
-            },
-        )
-        optimizer.maximize(init_points=10, n_iter=20, acq="ei")
-        params = optimizer.max["params"]
-        params["max_depth"] = round(params["max_depth"])
-        return catboost.CatBoostClassifier(
-            iterations=200,
-            loss_function="MultiClass",
-            verbose=False,
-            use_best_model=True,
-            eval_metric="MultiClass",
-            max_depth=params["max_depth"],
-            learning_rate=params["learning_rate"],
-            random_strength=params["random_strength"],
-            bagging_temperature=params["bagging_temperature"],
-            l2_leaf_reg=params["l2_leaf_reg"],
-        )
-
-    def _bo_tune(
-        self,
-        max_depth,
-        learning_rate,
-        bagging_temperature,
-        l2_leaf_reg,
-        random_strength,
-    ):
-        # Cross validating with the specified parameters in 5 folds
-        cv_inner = GroupShuffleSplit(
-            n_splits=3, train_size=0.66, random_state=42
-        )
-        scores = []
-        for train_index, test_index in cv_inner.split(
-            self.data_train, self.labels_train, self.groups_train
-        ):
-            data_train_, data_test_ = (
-                self.data_train[train_index],
-                self.data_train[test_index],
-            )
-            y_tr, y_te = (
-                self.labels_train[train_index],
-                self.labels_train[test_index],
-            )
-            groups_tr = self.groups_train[train_index]
-
-            (
-                data_train_,
-                y_tr,
-                eval_set_inner,
-            ) = self._get_validation_split(
-                data=data_train_,
-                labels=y_tr,
-                groups=groups_tr,
-                train_size=0.8,
-            )
-            data_train_, y_tr, sample_weight = self.balance_samples(
-                data_train_, y_tr
-            )
-            inner_model = catboost.CatBoostClassifier(
-                iterations=100,
-                loss_function="MultiClass",
-                verbose=False,
-                eval_metric="MultiClass",
-                max_depth=round(max_depth),
-                learning_rate=learning_rate,
-                bagging_temperature=bagging_temperature,
-                l2_leaf_reg=l2_leaf_reg,
-                random_strength=random_strength,
-            )
-            inner_model.fit(
-                data_train_,
-                y_tr,
-                eval_set=eval_set_inner,
-                early_stopping_rounds=25,
-                sample_weight=sample_weight,
-                verbose=False,
-            )
-            y_probs = inner_model.predict_proba(data_test_)
-            score = log_loss(y_te, y_probs, labels=[0, 1])
-            scores.append(score)
-        # Return the negative MLOGLOSS
-        return -1.0 * np.mean(scores)
 
 
 @dataclass

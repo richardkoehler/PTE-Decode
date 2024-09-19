@@ -27,7 +27,6 @@ requires-python = ">=3.10"
 
 dependencies = [
   "bayesian-optimization",
-  "catboost",
   "imbalanced-learn",
   "joblib",
   "matplotlib",
@@ -58,7 +57,8 @@ dev = [
   "ruff",
   "tox",
 ]
-pynm = ["py-neuromodulation @ git+https://github.com/richardkoehler/py_neuromodulation.git@563ee46d66937ac25ddcb9e6d6350bfa5fbb397d",
+pynm = [
+  "py-neuromodulation @ git+https://github.com/richardkoehler/py_neuromodulation.git@563ee46d66937ac25ddcb9e6d6350bfa5fbb397d",
 ]
 
 [tool.black]
@@ -71,7 +71,6 @@ metadata.allow-direct-references = true
 [[tool.mypy.overrides]]
 module = [
   "bayes_opt",
-  "catboost",
   "imblearn.*",
   "joblib",
   "matplotlib",
